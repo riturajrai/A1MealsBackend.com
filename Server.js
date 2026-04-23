@@ -23,7 +23,7 @@ const database  = require('./database/db');
 database();
 // origgin--------------
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://www.a1meals.com'  ,'https://www.readymealz.in',
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://www.a1meals.com'  ,'https://www.readymealz.in', 'https://admin.a1meals.com',
              'https://adminpannelready-mealz.vercel.app', 'https://admin.readymealz.in'],
     methods: ["GET", "POST", "PUT", "PATCH", 'DELETE' ,"OPTION"],
     credentials: true,
