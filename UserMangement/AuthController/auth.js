@@ -22,52 +22,17 @@ const generateToken = (user) => {
 exports.signup = async (req, res) => {
   try {
     const { name, email, password, mobile } = req.body;
-
     // Check existing user (email or mobile)
-    const existingUser = await User.findOne({
-      $or: [{ email }, { mobile }],
-    });
-
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email or Mobile already registered',
-      });
-    }
-
+    const existingUser = await User.findOne({$or: [{ email }, { mobile }]});
+    if (existingUser) {return res.status(400).json({success: false,message: 'Email or Mobile already registered'})}
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
     // Create user
-    const user = await User.create({
-      name,
-      email,
-      mobile,
-      password: hashedPassword,
-      role: 'user',
-      isActive: true,
-      isBlocked: false,
-      status: 'approved',
-    });
-
-
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        mobile: user.mobile,
-        role: user.role,
-      },
-    });
+    const user = await User.create({name, email, mobile, password: hashedPassword,role: 'user',isActive: true,isBlocked: false, status: 'approved',});
+    res.status(201).json({success: true,message: 'User registered successfully',user: {id: user._id,name: user.name,email: user.email,mobile: user.mobile,role: user.role,}});
   } catch (error) {
     console.error('Signup Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Signup failed',
-    });
+    res.status(500).json({success: false,message: 'Signup failed'});
   }
 };
 
@@ -134,15 +99,14 @@ exports.login = async (req, res) => {
     user.loginAttempts = 0;
     user.lastLogin = new Date();
     await user.save();
-
     // Generate token
     const token = generateToken(user);
 
     // Cookie store
     res.cookie('token', token, {
       httpOnly: true,
-      secure: false, // true in production (HTTPS)
-      sameSite: 'lax',
+      secure:  true, // true in production (HTTPS)
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -194,27 +158,11 @@ exports.logout = async (req, res) => {
 ========================================= */
 exports.getMe = async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not authenticated',
-      });
-    }
-
+    if (!req.user) {return res.status(401).json({success: false,message: 'User not authenticated',})}
     // IMPORTANT FIX: use id not _id
     const user = await User.findById(req.user.id).select('-password');
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      user,
-    });
+    if (!user) {return res.status(404).json({success: false, message: 'User not found'})}
+    res.status(200).json({success: true, user});
   } catch (error) {
     console.error('GetMe Error:', error);
     res.status(500).json({
@@ -243,6 +191,8 @@ exports.blockUser = async (req, res) => {
       message: 'User blocked successfully',
       user,
     });
+
+    
   } catch (error) {
     console.error('Block Error:', error);
     res.status(500).json({
@@ -256,27 +206,11 @@ exports.blockUser = async (req, res) => {
 ========================================= */
 exports.unblockUser = async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      {
-        isBlocked: false,
-        blockedAt: null,
-        blockedReason: '',
-      },
-      { new: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'User unblocked successfully',
-      user,
-    });
+    const user = await User.findByIdAndUpdate(req.params.id,{isBlocked: false,blockedAt: null,blockedReason: ''},{ new: true });
+    res.status(200).json({success: true,message: 'User unblocked successfully',user});
   } catch (error) {
     console.error('Unblock Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to unblock user',
-    });
+    res.status(500).json({success: false,message: 'Failed to unblock user'});
   }
 };
 
@@ -310,12 +244,7 @@ exports.deactivateUser = async (req, res) => {
 ========================================= */
 exports.activateUser = async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { isActive: true },
-      { new: true }
-    );
-
+    const user = await User.findByIdAndUpdate(req.params.id,{ isActive: true },{ new: true });
     res.status(200).json({
       success: true,
       message: 'User activated successfully',
