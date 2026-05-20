@@ -6,7 +6,7 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const DeveleryController = require("../models/Auth.Schema");
-const verifyUser = require('../middleware/PartnerMiddleware')
+const verifyUser = require('../middleware/PartnerMiddleware');
 
 // ================= REGISTER API =================
 router.post("/register",  async (req, res) => {
