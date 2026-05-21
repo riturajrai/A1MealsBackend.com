@@ -6,9 +6,12 @@ const Meal = require('../models/meal');
 const AuthMiddleware = require('../../middleware/authMiddleware');
 // Validation middleware
 const validateMealId = body('mealId').notEmpty().withMessage('Meal ID is required').isMongoId().withMessage('Invalid Meal ID format');
-const validateQuantity = body('quantity').notEmpty().withMessage('Quantity is required').isInt({ min: 1 }).withMessage('Quantity must be a positive integer');
-
-
+const validateQuantity = body('quantity')
+  .notEmpty()
+  .withMessage('Quantity is required')
+  .isInt({ min: -100, max: 100 })
+  .withMessage('Quantity must be a valid integer');
+  
 // Error handler middleware
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
