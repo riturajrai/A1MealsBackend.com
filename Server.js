@@ -45,7 +45,7 @@ app.get('/api' , ( req , res)=>{
     res.status(200).json("Your servers running on prot 5000")
 });
 
-// Server  -----------------------------------------------------------------
+// Server  -------------------------
 
 const PORT = process.env.PORT || 5000;
 
