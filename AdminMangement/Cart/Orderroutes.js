@@ -93,7 +93,6 @@ router.post('/create', protect, authorizeRoles('user'), validateDeliveryAddress,
           message: 'Items are required'
         });
       }
-
       // Validate each item and fetch meal details
       for (const item of items) {
         const meal = await Meal.findById(item.meal);
@@ -189,7 +188,6 @@ router.post('/create', protect, authorizeRoles('user'), validateDeliveryAddress,
 );
 
 
-
 router.post("/verify-payment", async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
@@ -214,12 +212,11 @@ router.post("/verify-payment", async (req, res) => {
   }
 });
 
-
-
 /**
  * GET USER'S ORDERS
  * GET /api/orders/my-orders
- */
+ **/
+
 router.get('/my-orders', protect, authorizeRoles('user'),
   async (req, res) => {
     try {
@@ -231,23 +228,14 @@ router.get('/my-orders', protect, authorizeRoles('user'),
       // Filter by status if provided
       if (status) {
         query.orderStatus = status;
-      }
-
+      };
       const skip = (Number(page) - 1) * Number(limit);
       const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
-
       const [orders, total] = await Promise.all([
-        Order.find(query)
-          .populate('items.meal', 'name price images').populate('deliveryAddress')
-          .sort(sort)
-          .skip(skip)
-          .limit(Number(limit))
-          .lean(),
+        Order.find(query).populate('items.meal', 'name price images').populate('deliveryAddress').sort(sort).skip(skip).limit(Number(limit)).lean(),
         Order.countDocuments(query)
       ]);
-
       console.log('Orders found:', orders.length);
-
       res.status(200).json({
         success: true,
         message: 'Orders retrieved successfully',
@@ -275,43 +263,40 @@ router.get('/my-orders', protect, authorizeRoles('user'),
 /**
  * GET SINGLE ORDER DETAILS
  * GET /api/orders/:orderId
- */
-router.get('/:orderId', protect, authorizeRoles('user', 'admin', 'superadmin'),
-  async (req, res) => {
+ **/
+
+router.get('/:orderId',protect,authorizeRoles('user', 'admin', 'superadmin'),async (req, res) => {
     try {
       const order = await Order.findById(req.params.orderId)
         .populate('user', 'name email phone')
-        .populate('items.meal', 'name slug price description images');
-
+        .populate('items.meal', 'name slug price description images').populate(
+    'deliveryAddress',
+    'recipientName phoneNumber fullAddress city pincode state'
+  );
       if (!order) {
-        return res.status(404).json({ success: false, message: 'Order not found' });
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found'
+        });
       }
-      //  FIX: Proper user ID comparison
       const requestUserId = (req.user._id || req.user.id).toString();
       const orderUserId = order.user._id.toString();
-      console.log(' Order details check:');
-      console.log('  Request user:', requestUserId);
-      console.log('  Order user:', orderUserId);
-      console.log('  User role:', req.user.role);
-      // User can only view their own orders (unless admin)
+      console.log('Order details check:');
+      console.log('Request user:', requestUserId);
+      console.log('Order user:', orderUserId);
+      console.log('User role:', req.user.role);
       if (req.user.role === 'user' && orderUserId !== requestUserId) {
         return res.status(403).json({
           success: false,
           message: 'You do not have permission to view this order'
         });
       }
-
-      res.status(200).json({
-        success: true,
-        message: 'Order retrieved successfully',
-        data: order
-      });
+      res.status(200).json({success: true,message: 'Order retrieved successfully',data: order});
     } catch (error) {
-      console.error('❌ Get order error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to retrieve order',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      console.error('Get order error:', error);
+      res.status(500).json({success: false, message: 'Failed to retrieve order', error: process.env.NODE_ENV === 'development'
+            ? error.message
+            : undefined
       });
     }
   }
@@ -320,7 +305,7 @@ router.get('/:orderId', protect, authorizeRoles('user', 'admin', 'superadmin'),
 /**
  * CANCEL ORDER - User can cancel their own orders
  * PATCH /api/orders/:orderId/cancel
- */
+ **/
 router.patch('/:orderId/cancel', protect, authorizeRoles('user'), async (req, res) => {
   try {
     const { reason = 'Customer requested cancellation' } = req.body;
@@ -416,7 +401,7 @@ router.get('/admin/all-orders', protect, authorizeRoles('admin', 'superadmin'),
       // Search by order number or customer name
 
 
-      // Date range filter
+      // Date range filter--------------
       if (startDate || endDate) {
         query.createdAt = {};
         if (startDate) query.createdAt.$gte = new Date(startDate);
@@ -465,25 +450,18 @@ router.get('/admin/all-orders', protect, authorizeRoles('admin', 'superadmin'),
  * UPDATE ORDER STATUS (Admin)
  * PATCH /api/orders/admin/:orderId/status
  */
-router.patch('/admin/:orderId/status',
-  protect,
-  authorizeRoles('admin', 'superadmin'),
-  body('newStatus')
-    .isIn(['placed', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'])
-    .withMessage('Invalid status'),
+router.patch('/admin/:orderId/status',protect,authorizeRoles('admin', 'superadmin'),body('newStatus').isIn(['placed', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled']).withMessage('Invalid status'),
   handleValidationErrors,
   async (req, res) => {
     try {
       const { newStatus, notes = '' } = req.body;
       const order = await Order.findById(req.params.orderId);
-
       if (!order) {
         return res.status(404).json({
           success: false,
           message: 'Order not found'
         });
       }
-
       // Validate status transition
       const validTransitions = {
         placed: ['confirmed', 'cancelled'],
@@ -494,7 +472,6 @@ router.patch('/admin/:orderId/status',
         delivered: [],
         cancelled: []
       };
-
       if (!validTransitions[order.orderStatus].includes(newStatus)) {
         return res.status(400).json({
           success: false,
@@ -503,7 +480,6 @@ router.patch('/admin/:orderId/status',
           allowedTransitions: validTransitions[order.orderStatus]
         });
       }
-
       // Update status
       order.orderStatus = newStatus;
       order.statusHistory.push({
@@ -718,14 +694,9 @@ router.get('/admin/analytics/summary', protect, authorizeRoles('admin', 'superad
  * EXPORT ORDERS (Admin) - CSV format
  * GET /api/orders/admin/export
  */
-router.get(
-  '/admin/export',
-  protect,
-  authorizeRoles('admin', 'superadmin'),
-  async (req, res) => {
+router.get('/admin/export',protect, authorizeRoles('admin', 'superadmin'), async (req, res) => {
     try {
       const { startDate, endDate, status } = req.query;
-
       const query = {};
       if (status) query.orderStatus = status;
       if (startDate || endDate) {
@@ -744,7 +715,7 @@ router.get(
           success: false,
           message: 'No orders found for export'
         });
-      }
+      };
 
       // Convert to CSV
       const headers = [
@@ -770,11 +741,7 @@ router.get(
         order.orderTotal,
         `${order.deliveryAddress?.fullAddress}, ${order.deliveryAddress?.city}, ${order.deliveryAddress?.pincode}`
       ]);
-
-      const csv = [headers, ...rows]
-        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-        .join('\n');
-
+      const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename=orders-export.csv');
       res.send(csv);
