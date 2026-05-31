@@ -230,42 +230,78 @@ router.post(
   }
 );
 
-/* ═══════════════════════════════════════════════
-   POST /verify-payment
-   ═══════════════════════════════════════════════ */
+/* =========================================================
+   VERIFY PAYMENT + CREATE ORDER AFTER SUCCESSFUL PAYMENT
+========================================================= */
 
-router.post('/verify-payment',protect,authorizeRoles('user'),async (req, res) => {
+router.post(
+  "/verify-payment",
+  protect,
+  authorizeRoles("user"),
+
+  async (req, res) => {
+
     try {
-      const {razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData } = req.body;
-      // =========================================
-      // VALIDATION
-      // =========================================
-      if ( !razorpay_order_id ||!razorpay_payment_id ||!razorpay_signature) {
+
+      const {
+
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+        orderData
+
+      } = req.body;
+
+      /* =========================================================
+         VALIDATION
+      ========================================================= */
+
+      if (
+        !razorpay_order_id ||
+        !razorpay_payment_id ||
+        !razorpay_signature
+      ) {
+
         return res.status(400).json({
+
           success: false,
+
           message:
-            'Payment details missing'
+            "Payment details missing"
         });
       }
 
-      // =========================================
-      // VERIFY SIGNATURE
-      // =========================================
+      if (!orderData) {
 
-      const expectedSignature =
-        crypto
-          .createHmac(
-            'sha256',
-            process.env.RAZORPAY_SECRET
-          )
-          .update(
-            `${razorpay_order_id}|${razorpay_payment_id}`
-          )
-          .digest('hex');
+        return res.status(400).json({
 
-      // =========================================
-      // INVALID SIGNATURE
-      // =========================================
+          success: false,
+
+          message:
+            "Order data missing"
+        });
+      }
+
+      /* =========================================================
+         VERIFY RAZORPAY SIGNATURE
+      ========================================================= */
+
+      const expectedSignature = crypto
+
+        .createHmac(
+          "sha256",
+          process.env.RAZORPAY_SECRET
+        )
+
+        .update(
+          `${razorpay_order_id}|${razorpay_payment_id}`
+        )
+
+        .digest("hex");
+
+      /* =========================================================
+         INVALID SIGNATURE
+      ========================================================= */
 
       if (
         expectedSignature !==
@@ -277,28 +313,13 @@ router.post('/verify-payment',protect,authorizeRoles('user'),async (req, res) =>
           success: false,
 
           message:
-            'Invalid payment signature'
+            "Invalid payment signature"
         });
       }
 
-      // =========================================
-      // CHECK ORDER DATA
-      // =========================================
-
-      if (!orderData) {
-
-        return res.status(400).json({
-
-          success: false,
-
-          message:
-            'Order data missing'
-        });
-      }
-
-      // =========================================
-      // PREVENT DUPLICATE ORDER
-      // =========================================
+      /* =========================================================
+         PREVENT DUPLICATE ORDERS
+      ========================================================= */
 
       const existingOrder =
         await Order.findOne({
@@ -314,74 +335,78 @@ router.post('/verify-payment',protect,authorizeRoles('user'),async (req, res) =>
           success: false,
 
           message:
-            'Order already exists'
+            "Order already exists"
         });
       }
 
-      // =========================================
-      // CREATE ORDER
-      // =========================================
+      /* =========================================================
+         CREATE ORDER
+      ========================================================= */
 
-      const order =
-        await new Order({
+      const order = new Order({
 
-          user:
-            req.user._id ||
-            req.user.id,
+        user:
+          req.user._id ||
+          req.user.id,
 
-          items:
-            orderData.items,
+        items:
+          orderData.items,
 
-          subtotal:
-            orderData.subtotal,
+        subtotal:
+          orderData.subtotal,
 
-          deliveryCharge:
-            orderData.pricing
-              .deliveryCharge,
+        deliveryCharge:
+          orderData.pricing
+            .deliveryCharge || 0,
 
-          surgeCharge:
-            orderData.pricing
-              .surgeCharge,
+        surgeCharge:
+          orderData.pricing
+            .surgeCharge || 0,
 
-          packagingCharge:
-            orderData.pricing
-              .packagingCharge,
+        packagingCharge:
+          orderData.pricing
+            .packagingCharge || 0,
 
-          tax:
-            orderData.pricing
-              .tax,
+        tax:
+          orderData.pricing
+            .gstAmount || 0,
 
-          distanceKm:
-            orderData.pricing
-              .distanceKm,
+        distanceKm:
+          orderData.pricing
+            .distanceKm || 0,
 
-          orderTotal:
-            orderData.pricing
-              .orderTotal,
+        orderTotal:
+          orderData.pricing
+            .finalAmount || 0,
 
-          paymentMethod:
-            'online',
+        paymentMethod:
+          "online",
 
-          paymentReference:
-            razorpay_payment_id,
+        paymentReference:
+          razorpay_payment_id,
 
-          deliveryAddress:
-            orderData.deliveryAddress,
+        deliveryAddress:
+          orderData.deliveryAddress,
 
-          specialRequests:
-            orderData.specialRequests || '',
+        specialRequests:
+          orderData.specialRequests || "",
 
-          orderStatus:
-            'placed',
+        orderStatus:
+          "placed",
 
-          paymentStatus:
-            'paid'
+        paymentStatus:
+          "paid"
+      });
 
-        }).save();
+      /* =========================================================
+         SAVE ORDER
+      ========================================================= */
 
-      // =========================================
-      // CLEAR CART
-      // =========================================
+      await order.save();
+
+      /* =========================================================
+         CLEAR USER CART
+      ========================================================= */
 
       await Cart.updateOne(
 
@@ -398,39 +423,45 @@ router.post('/verify-payment',protect,authorizeRoles('user'),async (req, res) =>
         }
       );
 
-      // =========================================
-      // POPULATE ORDER
-      // =========================================
+      /* =========================================================
+         POPULATE ORDER
+      ========================================================= */
 
       await order.populate([
 
         {
-          path: 'user',
+
+          path: "user",
+
           select:
-            'name email phone'
+            "name email phone"
         },
 
         {
-          path: 'items.meal',
+
+          path: "items.meal",
+
           select:
-            'name slug price images'
+            "name slug price images"
         },
 
         {
-          path: 'deliveryAddress'
+
+          path:
+            "deliveryAddress"
         }
       ]);
 
-      // =========================================
-      // RESPONSE
-      // =========================================
+      /* =========================================================
+         SUCCESS RESPONSE
+      ========================================================= */
 
       return res.status(200).json({
 
         success: true,
 
         message:
-          'Payment verified & order created successfully',
+          "Payment verified & order created successfully",
 
         data: {
 
@@ -447,7 +478,7 @@ router.post('/verify-payment',protect,authorizeRoles('user'),async (req, res) =>
     } catch (err) {
 
       console.error(
-        '[verify-payment]',
+        "[verify-payment]",
         err
       );
 
@@ -457,12 +488,11 @@ router.post('/verify-payment',protect,authorizeRoles('user'),async (req, res) =>
 
         message:
           err.message ||
-          'Payment verification failed'
+          "Payment verification failed"
       });
     }
   }
 );
-
 
 /**
  * GET USER'S ORDERS
